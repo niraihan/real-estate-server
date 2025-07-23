@@ -318,6 +318,80 @@ async function run() {
       res.send(offer);
     });
 
+    // PATCH: Update offer status and transactionId
+    // app.patch("/offers/:id/pay", async (req, res) => {
+    //   const id = req.params.id;
+    //   const { transactionId, status } = req.body;
+
+    //   try {
+    //     const result = await offersCollection.updateOne(
+    //       { _id: new ObjectId(id) },
+    //       {
+    //         $set: {
+    //           status: status,
+    //           transactionId: transactionId
+    //         }
+    //       }
+    //     );
+
+    //     if (result.modifiedCount === 0) {
+    //       return res.status(404).send({ message: "Offer not found or already paid" });
+    //     }
+
+    //     res.send({ message: "Payment info updated successfully", result });
+    //   } catch (error) {
+    //     console.error("Error in payment update:", error);
+    //     res.status(500).send({ message: "Server error during payment update" });
+    //   }
+    // });
+
+    app.patch("/offers/:id/pay", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { transactionId, status } = req.body;
+
+        const offer = await offersCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!offer) {
+          return res.status(404).send({ message: "Offer not found" });
+        }
+
+        // Step 1: Update the offer document
+        const updateResult = await offersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              status,
+              transactionId,
+            },
+          }
+        );
+
+        // Step 2: Insert into soldPropertiesCollection
+        const soldProperty = {
+          propertyId: offer.propertyId || id,
+          propertyTitle: offer.propertyTitle,
+          propertyLocation: offer.propertyLocation,
+          soldPrice: offer.offeredAmount,
+          buyerEmail: offer.userEmail,
+          buyerName: offer.userName,
+          agentEmail: offer.agentEmail,
+          transactionId: transactionId,
+          soldAt: new Date(),
+        };
+
+        const insertResult = await soldPropertiesCollection.insertOne(soldProperty);
+
+        res.send({
+          message: "Payment recorded and property marked as sold",
+          updated: updateResult.modifiedCount > 0,
+          inserted: insertResult.insertedId ? true : false,
+        });
+      } catch (error) {
+        console.error("Error in payment processing:", error);
+        res.status(500).send({ message: "Server error during payment" });
+      }
+    });
 
 
     // Reviews 10
