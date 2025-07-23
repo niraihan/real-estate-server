@@ -254,7 +254,7 @@ async function run() {
     //  Get all offers for a specific agent 9
     app.get("/offers/agent/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
-      
+
       // নিরাপত্তা চেক
       if (req.decoded.email !== email) {
         return res.status(403).send({ message: "Forbidden access" });
@@ -311,6 +311,13 @@ async function run() {
 
       res.send(result);
     });
+
+    app.get('/offers/single/:id', async (req, res) => {
+      const id = req.params.id;
+      const offer = await offersCollection.findOne({ _id: new ObjectId(id) });
+      res.send(offer);
+    });
+
 
 
     // Reviews 10
@@ -451,7 +458,7 @@ async function run() {
     //   res.send(result);
     // });
 
-    //-----chatgpt
+    //-----
     app.get("/properties/:id", async (req, res) => {
       const id = req.params.id;
       try {
