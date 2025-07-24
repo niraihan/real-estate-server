@@ -155,7 +155,7 @@ async function run() {
     app.post("/wishlist", async (req, res) => {
       const wishlistData = req.body;
       const { propertyId, userEmail } = wishlistData;
-
+      // console.log(wishlistData)
       try {
         // Check if the item is already in the wishlist
         const existing = await wishlistCollection.findOne({ propertyId, userEmail });
@@ -197,15 +197,60 @@ async function run() {
     //   res.send(result);
     // });
 
+    // app.post("/offers", verifyToken, async (req, res) => {
+    //   const offerData = req.body;
+    //   try {
+    //     const result = await offersCollection.insertOne(offerData);
+    //     res.send(result);
+    //   } catch (error) {
+    //     res.status(500).send({ message: "Failed to submit offer" });
+    //   }
+    // });
+
     app.post("/offers", verifyToken, async (req, res) => {
-      const offerData = req.body;
       try {
-        const result = await offersCollection.insertOne(offerData);
+        const offer = req.body;
+        // console.log("Received Offer Data:", offer);
+
+        // 🛡️ Validate propertyId
+        if (!offer.propertyId || !ObjectId.isValid(offer.propertyId)) {
+          return res.status(400).send({ message: "Invalid property ID" });
+        }
+        // console.log(" offer.propertyId valid:", ObjectId.isValid(offer.propertyId));
+        // ১. প্রপার্টি ডেটা নিয়ে আসা
+        const property = await propertiesCollection.findOne({ _id: new ObjectId(offer.propertyId) });
+
+        if (!property) {
+          return res.status(404).send({ message: "Property not found" });
+        }
+
+        // ২. প্রপার্টি বিক্রি হয়ে গেলে অফার গ্রহণ করবেনা
+        if (property.status === "sold") {
+          return res.status(400).send({ message: "Cannot make offer. Property already sold." });
+        }
+
+        // ৩. একই প্রপার্টিতে আগেই অফার করে থাকলে নতুন অফার নিবে না
+        const existingOffer = await offersCollection.findOne({
+          propertyId: offer.propertyId,
+          buyerEmail: offer.buyerEmail,
+          status: { $in: ["pending", "accepted"] },
+        });
+
+        if (existingOffer) {
+          return res.status(400).send({ message: "You have already made an offer for this property." });
+        }
+
+        // ৪. নতুন অফার ইনসার্ট করো
+        const result = await offersCollection.insertOne(offer);
         res.send(result);
+
       } catch (error) {
-        res.status(500).send({ message: "Failed to submit offer" });
+        console.error("Error creating offer:", error);
+        res.status(500).send({ message: "Internal server error" });
       }
     });
+
+
 
     app.get("/offers", verifyToken, async (req, res) => {
       const result = await offersCollection.find().toArray();
@@ -318,32 +363,58 @@ async function run() {
       res.send(offer);
     });
 
-    // PATCH: Update offer status and transactionId
-    // app.patch("/offers/:id/pay", async (req, res) => {
-    //   const id = req.params.id;
-    //   const { transactionId, status } = req.body;
 
+    // PATCH: Update offer status and transactionId
+
+
+    // app.patch("/offers/:id/pay", verifyToken, async (req, res) => {
     //   try {
-    //     const result = await offersCollection.updateOne(
+    //     const id = req.params.id;
+    //     const { transactionId, status } = req.body;
+
+    //     const offer = await offersCollection.findOne({ _id: new ObjectId(id) });
+
+    //     if (!offer) {
+    //       return res.status(404).send({ message: "Offer not found" });
+    //     }
+
+    //     // Step 1: Update the offer document
+    //     const updateResult = await offersCollection.updateOne(
     //       { _id: new ObjectId(id) },
     //       {
     //         $set: {
-    //           status: status,
-    //           transactionId: transactionId
-    //         }
+    //           status,
+    //           transactionId,
+    //         },
     //       }
     //     );
 
-    //     if (result.modifiedCount === 0) {
-    //       return res.status(404).send({ message: "Offer not found or already paid" });
-    //     }
+    //     // Step 2: Insert into soldPropertiesCollection
+    //     const soldProperty = {
+    //       propertyId: offer.propertyId || id,
+    //       propertyTitle: offer.propertyTitle,
+    //       propertyLocation: offer.propertyLocation,
+    //       soldPrice: offer.offeredAmount,
+    //       buyerEmail: offer.userEmail,
+    //       buyerName: offer.userName,
+    //       agentEmail: offer.agentEmail,
+    //       transactionId: transactionId,
+    //       soldAt: new Date(),
+    //     };
 
-    //     res.send({ message: "Payment info updated successfully", result });
+    //     const insertResult = await soldPropertiesCollection.insertOne(soldProperty);
+
+    //     res.send({
+    //       message: "Payment recorded and property marked as sold",
+    //       updated: updateResult.modifiedCount > 0,
+    //       inserted: insertResult.insertedId ? true : false,
+    //     });
     //   } catch (error) {
-    //     console.error("Error in payment update:", error);
-    //     res.status(500).send({ message: "Server error during payment update" });
+    //     console.error("Error in payment processing:", error);
+    //     res.status(500).send({ message: "Server error during payment" });
     //   }
     // });
+
 
     app.patch("/offers/:id/pay", verifyToken, async (req, res) => {
       try {
@@ -356,7 +427,7 @@ async function run() {
           return res.status(404).send({ message: "Offer not found" });
         }
 
-        // Step 1: Update the offer document
+        // Step 1: Accept current offer (update with status + transactionId)
         const updateResult = await offersCollection.updateOne(
           { _id: new ObjectId(id) },
           {
@@ -367,14 +438,23 @@ async function run() {
           }
         );
 
-        // Step 2: Insert into soldPropertiesCollection
+        // Step 2: Reject all other offers for same property
+        const rejectResult = await offersCollection.updateMany(
+          {
+            propertyId: offer.propertyId,
+            _id: { $ne: new ObjectId(id) },
+          },
+          { $set: { status: "rejected" } }
+        );
+
+        // Step 3: Insert into soldProperties
         const soldProperty = {
-          propertyId: offer.propertyId || id,
+          propertyId: offer.propertyId,
           propertyTitle: offer.propertyTitle,
           propertyLocation: offer.propertyLocation,
           soldPrice: offer.offeredAmount,
-          buyerEmail: offer.userEmail,
-          buyerName: offer.userName,
+          buyerEmail: offer.buyerEmail,
+          buyerName: offer.buyerName,
           agentEmail: offer.agentEmail,
           transactionId: transactionId,
           soldAt: new Date(),
@@ -383,8 +463,9 @@ async function run() {
         const insertResult = await soldPropertiesCollection.insertOne(soldProperty);
 
         res.send({
-          message: "Payment recorded and property marked as sold",
+          message: "Offer accepted, others rejected, and sale recorded",
           updated: updateResult.modifiedCount > 0,
+          rejected: rejectResult.modifiedCount,
           inserted: insertResult.insertedId ? true : false,
         });
       } catch (error) {
@@ -392,6 +473,8 @@ async function run() {
         res.status(500).send({ message: "Server error during payment" });
       }
     });
+
+
 
 
     // Reviews 10
@@ -760,6 +843,20 @@ async function run() {
         res.status(500).send({ message: "Failed to update property" });
       }
     });
+
+    // sold property API
+    app.put("/properties/sold/:id", async (req, res) => {
+     
+      const id = req.params.id;
+       // console.log(id)
+      const result = await propertiesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status: "sold" } }
+      );
+      // console.log(result)
+      res.send(result);
+    });
+
 
 
     app.delete("/properties/:id", verifyToken, async (req, res) => {
