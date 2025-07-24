@@ -221,7 +221,7 @@ async function run() {
         const offer = req.body;
         // console.log("Received Offer Data:", offer);
 
-        // 🛡️ Validate propertyId
+        //  Validate propertyId
         if (!offer.propertyId || !ObjectId.isValid(offer.propertyId)) {
           return res.status(400).send({ message: "Invalid property ID" });
         }
@@ -634,11 +634,52 @@ async function run() {
       res.send(result);
     });
 
-    // Properties 13
+    // Properties 13------------------
+
+
+    // app.get("/properties", async (req, res) => {
+    //   const result = await propertiesCollection.find().toArray();
+    //   res.send(result);
+    // });
+
     app.get("/properties", async (req, res) => {
-      const result = await propertiesCollection.find().toArray();
-      res.send(result);
+      try {
+        const { search, sort } = req.query;
+
+        // ✅ Search query + verified/sold filter
+        const query = {
+          status: { $in: ["verified", "sold"] },
+        };
+
+        // ✅ Optional search on location or title
+        if (search) {
+          query.$or = [
+            { location: { $regex: search, $options: "i" } },
+            { title: { $regex: search, $options: "i" } },
+          ];
+        }
+
+        // ✅ Optional sort by priceMin
+        const sortOption = {};
+        if (sort === "asc") {
+          sortOption.priceMin = 1;
+        } else if (sort === "desc") {
+          sortOption.priceMin = -1;
+        }
+
+        // ✅ Find and sort from collection
+        const result = await propertiesCollection
+          .find(query)
+          .sort(sortOption)
+          .toArray();
+
+        res.send(result);
+      } catch (err) {
+        console.error("Failed to fetch properties:", err);
+        res.status(500).send({ error: "Internal Server Error" });
+      }
     });
+
 
     // app.get("/properties/:id", async (req, res) => {
     //   console.log("hello")
