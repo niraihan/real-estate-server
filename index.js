@@ -66,6 +66,13 @@ async function run() {
       res.send({ token });
     });
 
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const user = await usersCollection.findOne({ email });
+      res.send(user);
+    });
+
+
     // ✅ Get user role (for useRole hook) 4
     app.get("/users/role/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
@@ -79,6 +86,8 @@ async function run() {
 
       res.send({ role: user.role });
     });
+
+
 
     // Users CRUD 5
     app.post("/users", async (req, res) => {
