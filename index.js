@@ -478,12 +478,27 @@ async function run() {
 
 
     // Reviews 10
+    // app.post("/reviews", verifyToken, async (req, res) => {
+    //   const review = req.body;
+    //   review.time = new Date();
+    //   const result = await reviewCollection.insertOne(review);
+    //   res.send(result);
+    // });
+
     app.post("/reviews", verifyToken, async (req, res) => {
       const review = req.body;
+
+      // যদি rating না থাকে, তাহলে default 4
+      if (!review.rating || review.rating < 1 || review.rating > 5) {
+        review.rating = 4;
+      }
+      // রিভিউ টাইম সংযুক্ত করা
       review.time = new Date();
+
       const result = await reviewCollection.insertOne(review);
       res.send(result);
     });
+
 
     app.get("/reviews", async (req, res) => {
       const result = await reviewCollection.find().toArray();
@@ -550,6 +565,8 @@ async function run() {
     });
 
     app.get("/reviews/user/:email", verifyToken, async (req, res) => {
+
+      console.log("Reviews")
       const email = req.params.email;
 
       // Security check
@@ -558,13 +575,20 @@ async function run() {
       }
 
       try {
-        const userReviews = await reviewCollection.find({ reviewerEmail: email }).toArray();
+        const userReviews = await reviewCollection.find({ userEmail: email }).toArray();
         res.send(userReviews);
       } catch (error) {
         console.error("Failed to fetch user reviews:", error);
         res.status(500).send({ message: "Error fetching user reviews" });
       }
     });
+
+    app.delete("/reviews/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const result = await reviewCollection.deleteOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
+
 
     app.get('/latest/reviews', async (req, res) => {
       // console.log("hello")
@@ -846,9 +870,9 @@ async function run() {
 
     // sold property API
     app.put("/properties/sold/:id", async (req, res) => {
-     
+
       const id = req.params.id;
-       // console.log(id)
+      // console.log(id)
       const result = await propertiesCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: { status: "sold" } }
