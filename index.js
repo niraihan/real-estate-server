@@ -151,6 +151,38 @@ async function run() {
       res.send(result);
     });
 
+    // user কে fraud হিসেবে চিহ্নিত করা
+  
+
+    app.patch("/users/fraud/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Step 1: Find the agent using _id
+        const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!user) {
+          return res.status(404).send({ error: "User not found" });
+        }
+
+        // Step 2: Mark user as fraud
+        await usersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { isFraud: true } }
+        );
+
+        // Step 3: Delete all properties added by this agent
+        await propertiesCollection.deleteMany({ agentEmail: user.email });
+
+        res.send({ message: "User marked as fraud and properties removed" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: "Failed to mark user as fraud" });
+      }
+    });
+
+
+
 
 
     // Wishlist 7
@@ -621,6 +653,7 @@ async function run() {
       const reviews = await db.collection('reviews').find().sort({ date: -1 }).limit(3).toArray();
       res.send(reviews);
     });
+
 
     // Payments 12
     app.post("/payments", verifyToken, async (req, res) => {
