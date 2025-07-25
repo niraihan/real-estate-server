@@ -89,24 +89,19 @@ async function run() {
 
 
 
-  
-    // Update User Info API 6
-    app.patch("/users/update/:email", async (req, res) => {
-      const email = req.params.email;
-      const userInfo = req.body;
+    // Users CRUD 5
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const existingUser = await usersCollection.findOne({ email: user.email });
+      if (existingUser) {
+        return res.send({ message: "User already exists" });
+      }
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
 
-      const result = await usersCollection.updateOne(
-        { email },
-        {
-          $set: {
-            name: userInfo.name,
-            photoURL: userInfo.photoURL,
-            phone: userInfo.phone,
-            address: userInfo.address,
-          },
-        }
-      );
-
+    app.get("/users", verifyToken, async (req, res) => {
+      const result = await usersCollection.find().toArray();
       res.send(result);
     });
 
@@ -120,6 +115,13 @@ async function run() {
       res.send(result);
     });
 
+    app.delete("/users/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
+
+    
     // user কে fraud হিসেবে চিহ্নিত করা
 
 
