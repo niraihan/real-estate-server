@@ -23,24 +23,6 @@ const client = new MongoClient(uri, {
   },
 });
 
-// ✅ JWT Verify Middleware 1
-const verifyToken = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    return res.status(401).send({ message: "Unauthorized - No Token" });
-  }
-
-  const token = authHeader.split(" ")[1];
-  // console.log(token)
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(401).send({ message: "Unauthorized - Invalid Token" });
-    }
-    req.decoded = decoded;
-    next();
-  });
-};
 
 // Main function
 async function run() {
@@ -152,7 +134,7 @@ async function run() {
     });
 
     // user কে fraud হিসেবে চিহ্নিত করা
-  
+
 
     app.patch("/users/fraud/:id", async (req, res) => {
       try {
@@ -874,10 +856,32 @@ async function run() {
     // });
 
 
-    app.post("/properties", verifyToken, async (req, res) => {
-      const property = req.body;
-      const result = await propertiesCollection.insertOne(property);
-      res.send(result);
+    // app.post("/properties", verifyToken, async (req, res) => {
+    //   const property = req.body;
+    //   const result = await propertiesCollection.insertOne(property);
+    //   res.send(result);
+    // });
+
+    app.post("/properties", async (req, res) => {
+      try {
+        const property = req.body;
+        const agentEmail = property.agentEmail;
+
+        // Step 1: Find agent from users collection
+        const agent = await usersCollection.findOne({ email: agentEmail });
+
+        // Step 2: Check if fraud
+        if (agent?.role === "agent" && agent?.isFraud) {
+          return res.status(403).send({ message: "Fraud agents cannot add properties." });
+        }
+
+        // Step 3: Add property
+        const result = await propertiesCollection.insertOne(property);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: "Failed to add property" });
+      }
     });
 
     // ✅ PATCH: Verify a property (Admin Only)
@@ -894,6 +898,7 @@ async function run() {
         const result = await propertiesCollection.updateOne(
           { _id: new ObjectId(id) },
           { $set: { status: "verified" } }
+          // { $set: { verificationStatus: "verified" } }
         );
 
         res.send(result);
@@ -902,6 +907,28 @@ async function run() {
         res.status(500).send({ message: "Failed to verify property" });
       }
     });
+
+    // Example: PATCH /properties/:id/verify
+    // app.patch("/properties/:id/verify", verifyToken, async (req, res) => {
+    //   try {
+    //     const id = req.params.id;
+    //     // Update verificationStatus to 'verified'
+    //     const result = await propertiesCollection.updateOne(
+    //       { _id: new ObjectId(id) },
+    //       { $set: { verificationStatus: "verified" } }
+    //     );
+
+    //     if (result.modifiedCount === 1) {
+    //       return res.send({ message: "Property verified successfully" });
+    //     } else {
+    //       return res.status(404).send({ error: "Property not found" });
+    //     }
+    //   } catch (error) {
+    //     console.error(error);
+    //     res.status(500).send({ error: "Failed to verify property" });
+    //   }
+    // });
+
 
     // ✅ PATCH: Reject a property (Admin Only)
     app.patch("/admin/properties/reject/:id", verifyToken, async (req, res) => {
