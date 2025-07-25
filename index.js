@@ -121,7 +121,36 @@ async function run() {
       res.send(result);
     });
 
-    
+    // Update User Info API 6
+    app.patch("/users/update/:email", async (req, res) => {
+      const email = req.params.email;
+      const userInfo = req.body;
+
+      const result = await usersCollection.updateOne(
+        { email },
+        {
+          $set: {
+            name: userInfo.name,
+            photoURL: userInfo.photoURL,
+            phone: userInfo.phone,
+            address: userInfo.address,
+          },
+        }
+      );
+
+      res.send(result);
+    });
+
+    app.patch("/users/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const updatedData = req.body;
+      const result = await usersCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updatedData }
+      );
+      res.send(result);
+    });
+
     // user কে fraud হিসেবে চিহ্নিত করা
 
 
