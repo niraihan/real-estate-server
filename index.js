@@ -803,6 +803,7 @@ async function run() {
     app.patch("/properties/advertise/:id", async (req, res) => {
       try {
         const id = req.params.id;
+         const { advertised } = req.body; // client থেকে advertised মান আসবে zodi ami unadv korta cai
         const query = { _id: new ObjectId(id) };
         const updateDoc = {
           $set: { advertised: true }
