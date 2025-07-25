@@ -23,6 +23,24 @@ const client = new MongoClient(uri, {
   },
 });
 
+// ✅ JWT Verify Middleware 1
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).send({ message: "Unauthorized - No Token" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  // console.log(token)
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "Unauthorized - Invalid Token" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
 
 // Main function
 async function run() {
@@ -71,38 +89,7 @@ async function run() {
 
 
 
-    // Users CRUD 5
-    app.post("/users", async (req, res) => {
-      const user = req.body;
-      const existingUser = await usersCollection.findOne({ email: user.email });
-      if (existingUser) {
-        return res.send({ message: "User already exists" });
-      }
-      const result = await usersCollection.insertOne(user);
-      res.send(result);
-    });
-
-    app.get("/users", verifyToken, async (req, res) => {
-      const result = await usersCollection.find().toArray();
-      res.send(result);
-    });
-
-    app.patch("/users/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const updatedData = req.body;
-      const result = await usersCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: updatedData }
-      );
-      res.send(result);
-    });
-
-    app.delete("/users/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
-      res.send(result);
-    });
-
+  
     // Update User Info API 6
     app.patch("/users/update/:email", async (req, res) => {
       const email = req.params.email;
