@@ -803,7 +803,6 @@ async function run() {
     app.patch("/properties/advertise/:id", async (req, res) => {
       try {
         const id = req.params.id;
-         const { advertised } = req.body; // client থেকে advertised মান আসবে zodi ami unadv korta cai
         const query = { _id: new ObjectId(id) };
         const updateDoc = {
           $set: { advertised: true }
@@ -845,6 +844,28 @@ async function run() {
 
     // ✅ Mark a property as advertised
 
+    // app.patch("/admin/advertise/:id", verifyToken, async (req, res) => {
+    //   try {
+    //     const decodedEmail = req.decoded.email;
+    //     const adminUser = await usersCollection.findOne({ email: decodedEmail });
+
+    //     if (adminUser?.role !== "admin") {
+    //       return res.status(403).send({ message: "Forbidden - Admins Only" });
+    //     }
+
+    //     const id = req.params.id;
+    //     const result = await propertiesCollection.updateOne(
+    //       { _id: new ObjectId(id) },
+    //       { $set: { advertised: true } }
+    //     );
+
+    //     res.send(result);
+    //   } catch (error) {
+    //     console.error("Error advertising property:", error);
+    //     res.status(500).send({ message: "Failed to advertise property" });
+    //   }
+    // });
+
     app.patch("/admin/advertise/:id", verifyToken, async (req, res) => {
       try {
         const decodedEmail = req.decoded.email;
@@ -855,17 +876,20 @@ async function run() {
         }
 
         const id = req.params.id;
+        const { advertised } = req.body;
+
         const result = await propertiesCollection.updateOne(
           { _id: new ObjectId(id) },
-          { $set: { advertised: true } }
+          { $set: { advertised: advertised } }
         );
 
         res.send(result);
       } catch (error) {
         console.error("Error advertising property:", error);
-        res.status(500).send({ message: "Failed to advertise property" });
+        res.status(500).send({ message: "Failed to update advertisement status" });
       }
     });
+
 
     // PATCH: Toggle Advertised
     // app.patch("/admin/advertise/:id", verifyToken, verifyAdmin, async (req, res) => {
