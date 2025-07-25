@@ -781,10 +781,25 @@ async function run() {
 
     // Advertisement API route 14
 
+    // app.get("/advertised", async (req, res) => {
+    //   const result = await propertiesCollection.find({ advertised: true }).toArray();
+    //   res.send(result);
+    // });
+
+    // Advertised Properties Get API (Newest First)
     app.get("/advertised", async (req, res) => {
-      const result = await propertiesCollection.find({ advertised: true }).toArray();
-      res.send(result);
+      try {
+        const result = await propertiesCollection
+          .find({ advertised: true })
+          .sort({ createdAt: -1 }) // newest first
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to fetch advertised properties." });
+      }
     });
+
+    // Advertise Property by ID
     app.patch("/properties/advertise/:id", async (req, res) => {
       try {
         const id = req.params.id;
