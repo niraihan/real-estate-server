@@ -198,6 +198,11 @@ async function run() {
       const { propertyId, userEmail } = wishlistData;
       // console.log(wishlistData)
       try {
+        // Check if already sold
+        const sold = await soldPropertiesCollection.findOne({ propertyId });
+        if (sold) {
+          return res.status(400).send({ message: "This property is already sold" });
+        }
         // Check if the item is already in the wishlist
         const existing = await wishlistCollection.findOne({ propertyId, userEmail });
 
@@ -207,6 +212,7 @@ async function run() {
 
         const result = await wishlistCollection.insertOne(wishlistData);
         res.send(result);
+
       } catch (error) {
         console.error("Error adding to wishlist:", error);
         res.status(500).send({ message: "Server error" });
@@ -407,7 +413,6 @@ async function run() {
 
     // PATCH: Update offer status and transactionId
 
-
     // app.patch("/offers/:id/pay", verifyToken, async (req, res) => {
     //   try {
     //     const id = req.params.id;
@@ -456,6 +461,7 @@ async function run() {
     //   }
     // });
 
+    //নিচের এই কন্ডিশন মনে রাখতে হবে এইখানে একসাথে অনেক কাজ হচ্ছে যেগুলো আগে আলাদা আলাদা করে বানিয়ে ছিলাম / তা এই ভাবে অ করা যায়
 
     app.patch("/offers/:id/pay", verifyToken, async (req, res) => {
       try {
@@ -468,7 +474,7 @@ async function run() {
           return res.status(404).send({ message: "Offer not found" });
         }
 
-        // Step 1: Accept current offer (update with status + transactionId)
+        // Step 1: Accept current offer
         const updateResult = await offersCollection.updateOne(
           { _id: new ObjectId(id) },
           {
@@ -479,7 +485,7 @@ async function run() {
           }
         );
 
-        // Step 2: Reject all other offers for same property
+        // Step 2: Reject all other offers
         const rejectResult = await offersCollection.updateMany(
           {
             propertyId: offer.propertyId,
@@ -503,11 +509,17 @@ async function run() {
 
         const insertResult = await soldPropertiesCollection.insertOne(soldProperty);
 
+        //  Step 4: Remove from wishlist
+        const deleteWishlist = await wishlistCollection.deleteMany({
+          propertyId: offer.propertyId,
+        });
+
         res.send({
-          message: "Offer accepted, others rejected, and sale recorded",
+          message: "Offer accepted, others rejected, sale recorded, and wishlist cleared",
           updated: updateResult.modifiedCount > 0,
           rejected: rejectResult.modifiedCount,
           inserted: insertResult.insertedId ? true : false,
+          wishlistDeleted: deleteWishlist.deletedCount,
         });
       } catch (error) {
         console.error("Error in payment processing:", error);
@@ -775,6 +787,12 @@ async function run() {
         console.error("Error fetching sold properties:", error);
         res.status(500).send({ message: "Failed to fetch sold properties" });
       }
+    });
+    //sold property khuja 
+    app.get("/sold-properties/:id", async (req, res) => {
+      const propertyId = req.params.id;
+      const sold = await soldPropertiesCollection.findOne({ propertyId });
+      res.send({ sold: !!sold });
     });
 
     // ---------
