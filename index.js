@@ -915,7 +915,12 @@ async function run() {
         const id = req.params.id;
         const result = await propertiesCollection.updateOne(
           { _id: new ObjectId(id) },
-          { $set: { status: "verified" } }
+          {
+            $set: {
+              status: "verified",
+              verificationStatus: "verified"
+            }
+          } //Eikhan ami vhul korchilam 
           // { $set: { verificationStatus: "verified" } }
         );
 
@@ -1003,7 +1008,7 @@ async function run() {
       // console.log(id)
       const result = await propertiesCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: { status: "sold" } }
+        { $set: { status: "sold", verificationStatus: "sold" } }
       );
       // console.log(result)
       res.send(result);
