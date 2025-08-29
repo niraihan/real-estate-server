@@ -1024,7 +1024,7 @@ async function run() {
         const id = req.params.id;
         const result = await propertiesCollection.updateOne(
           { _id: new ObjectId(id) },
-          { $set: { status: "rejected" } }
+          { $set: { status: "rejected",verificationStatus: "rejected" } }
         );
 
         res.send(result);
